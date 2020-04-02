@@ -14,7 +14,7 @@ const main = async () => {
     console.log('peers', peers);
   });
 
-  downloader.start();
+  await downloader.start();
 };
 
 main().catch(e => console.error(e));

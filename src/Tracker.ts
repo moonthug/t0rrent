@@ -5,6 +5,9 @@ import { parse as parseURL, Url } from 'url';
 import { Protocol, ResponseType } from './Protocol';
 import { Torrent } from './Torrent';
 
+import Debug from 'debug';
+const debug = Debug('t0rrent:tracker');
+
 /**
  *
  */
@@ -34,6 +37,7 @@ export class Tracker extends EventEmitter {
    *
    */
   public async getPeers(): Promise<number> {
+    debug('get peers');
     return this._socketSend(Protocol.connectionRequest());
   }
 
@@ -43,6 +47,8 @@ export class Tracker extends EventEmitter {
    * @private
    */
   private async _socketSend (message: Buffer): Promise<number> {
+    debug(`socket send: ${this.torrent.announceURL()}`);
+
     const parsedUrl: Url = parseURL(this.torrent.announceURL());
 
     return new Promise((resolve, reject) => {
@@ -64,11 +70,15 @@ export class Tracker extends EventEmitter {
       const responseType = Protocol.getResponseType(response);
 
       if (responseType === ResponseType.connect) {
+        debug(`received connect`);
+
         const connectionResponse = Protocol.connectionResponse(response);
         const announcementRequest = Protocol.announcementRequest(connectionResponse.connectionId, this.torrent);
         this.emit('connected');
         await this._socketSend(announcementRequest);
       } else if (responseType === ResponseType.announce) {
+        debug(`received announce`);
+
         const announcementResponse = Protocol.announcementResponse(response);
         this.emit('peers', announcementResponse.peers)
       }

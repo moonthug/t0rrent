@@ -4,8 +4,12 @@ import { Torrent } from './Torrent';
 import { Tracker } from './Tracker';
 import { DownloadSocket } from './DownloadSocket';
 import { Peer } from './Peer';
+import { Pieces } from './Pieces';
 
-export class Downloader extends EventEmitter{
+import Debug from 'debug';
+const debug = Debug('t0rrent:downloader');
+
+export class Downloader extends EventEmitter {
 
   /**
    *
@@ -20,7 +24,7 @@ export class Downloader extends EventEmitter{
   /**
    *
    */
-  private readonly _requested: Array<boolean>;
+  private readonly _pieces: Pieces;
 
   /**
    *
@@ -35,7 +39,7 @@ export class Downloader extends EventEmitter{
     this._torrent = torrent;
 
     this._tracker = new Tracker(this._torrent);
-    this._requested = [];
+    this._pieces = new Pieces(this._torrent);
     this._sockets = [];
 
     this._createTrackerHandler();
@@ -45,6 +49,12 @@ export class Downloader extends EventEmitter{
    *
    */
   public async start(): Promise<void> {
+    debug(`start download: ${this._torrent.info().name.toString('utf-8')}`);
+
+    const interval = setInterval(async () => {
+      await this._tracker.getPeers();
+    }, 10000);
+
     await this._tracker.getPeers();
   }
 
@@ -66,14 +76,22 @@ export class Downloader extends EventEmitter{
    * @private
    */
   private _createDownloaderSocket(peer: Peer): void {
-    const socket = new DownloadSocket(peer, this._torrent, this._requested);
+    const socket = new DownloadSocket(peer, this._torrent, this._pieces);
 
     socket.on('error', (error: Error) => {
-      console.log(`Socket Error => Connected: ${socket.isConnected}`)
+      console.log(`Socket Error => Connected: ${socket.isConnected}`);
     });
 
-    socket.on('connected', (error: Error) => {
-      console.log(`Socket Connected => Connected: ${socket.isConnected}`)
+    socket.on('connected', () => {
+      console.log(`Socket Connected => Connected: ${socket.isConnected}`);
+    });
+
+    socket.on('handshake', () => {
+      console.log(`Handshake Complete`);
+    });
+
+    socket.on('complete', () => {
+      console.log(`Socket download Complete`);
     });
 
     this._sockets.push(socket);

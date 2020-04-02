@@ -10,6 +10,9 @@ import { Queue } from './Queue';
 import { Pieces } from './Pieces';
 import * as fs from 'fs';
 
+import Debug from 'debug';
+const debug = Debug('t0rrent:download-socket');
+
 
 export class DownloadSocket extends EventEmitter {
 
@@ -27,11 +30,6 @@ export class DownloadSocket extends EventEmitter {
    *
    */
   private readonly _torrent: Torrent;
-
-  /**
-   *
-   */
-  private readonly _requested: Array<boolean>;
 
   /**
    *
@@ -60,20 +58,19 @@ export class DownloadSocket extends EventEmitter {
   /**
    *
    */
-  constructor (peer: Peer, torrent: Torrent, requested: Array<boolean>) {
+  constructor (peer: Peer, torrent: Torrent, pieces: Pieces) {
     super();
     this._peer = peer;
     this._torrent = torrent;
-    this._requested = requested;
 
     this._socket = new Socket();
     this._queue = new Queue(this._torrent);
-    this._pieces = new Pieces(this._torrent);
+    this._pieces = pieces;
     this._messageFactory = new MessageFactory();
 
     this._fileHandle = fs.openSync('.temp', 'w');
 
-    console.log(`Created Download Socket: ${this._peer}`);
+    debug(`download socket created for peer ${peer}`);
 
     this._createSocketHandler();
   }
@@ -130,6 +127,7 @@ export class DownloadSocket extends EventEmitter {
    */
   private _messageHandler (messageData: Buffer) {
     if (Protocol.isHandshake(messageData)) {
+      this.emit('handshake');
       this._socket.write(Protocol.interested());
     } else {
       const message = this._messageFactory.createMessage(messageData);
@@ -202,6 +200,7 @@ export class DownloadSocket extends EventEmitter {
 
     if (this._pieces.isDone()) {
       console.log('DONE!');
+      this.emit('complete');
       this._socket.end();
       try {
         fs.closeSync(this._fileHandle);
